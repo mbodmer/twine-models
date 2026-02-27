@@ -5,6 +5,7 @@
 pub mod constraint;
 pub mod control;
 pub mod hx;
+pub mod schedule;
 pub mod thermo;
 pub mod turbomachinery;
 pub mod units;
