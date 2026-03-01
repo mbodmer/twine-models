@@ -12,9 +12,8 @@ description = "Domain-specific models and model-building tools for Twine"
 num-traits = "0.2"
 rfluids = { version = "0.3.0", optional = true }
 thiserror = "2.0"
-# TODO: Switch to version dependencies once twine-core 0.5 and twine-solvers 0.5 are published to crates.io
-twine-core = { git = "https://github.com/isentropic-dev/twine.git", branch = "main" }
-twine-solvers = { git = "https://github.com/isentropic-dev/twine.git", branch = "main" }
+twine-core = "0.5"
+twine-solvers = "0.5"
 uom = "0.36"
 
 [features]

@@ -1,5 +1,6 @@
+use twine_core::StepIntegrable;
 use uom::si::{
-    f64::{MassDensity, SpecificHeatCapacity},
+    f64::{MassDensity, SpecificHeatCapacity, Time},
     mass_density::kilogram_per_cubic_meter,
     specific_heat_capacity::kilojoule_per_kilogram_kelvin,
 };
@@ -18,6 +19,14 @@ impl IncompressibleFluid for Water {
             SpecificHeatCapacity::new::<kilojoule_per_kilogram_kelvin>(4.184),
             MassDensity::new::<kilogram_per_cubic_meter>(997.047),
         )
+    }
+}
+
+impl StepIntegrable<Time> for Water {
+    type Derivative = ();
+
+    fn step(&self, (): (), _: Time) -> Self {
+        *self
     }
 }
 

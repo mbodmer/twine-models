@@ -262,7 +262,8 @@ dependencies = [
 [[package]]
 name = "twine-core"
 version = "0.5.0"
-source = "git+https://github.com/isentropic-dev/twine.git?branch=main#ce723ce408c17167a435cc11b7a70c68dce36615"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ff0c319e9838813ab378aea2a73615e9c060dbe6bc0f35688006545185be2968"
 
 [[package]]
 name = "twine-models"
@@ -280,7 +281,8 @@ dependencies = [
 [[package]]
 name = "twine-solvers"
 version = "0.5.0"
-source = "git+https://github.com/isentropic-dev/twine.git?branch=main#ce723ce408c17167a435cc11b7a70c68dce36615"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f41c85bf9289cb42b0bd37c8106eaa8e244e44801122c422391658fb5dbad3f7"
 dependencies = [
  "thiserror",
  "twine-core",

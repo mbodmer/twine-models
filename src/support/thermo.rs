@@ -10,4 +10,4 @@ pub mod fluid;
 pub mod model;
 
 pub use error::PropertyError;
-pub use state::State;
+pub use state::{State, StateDerivative};
