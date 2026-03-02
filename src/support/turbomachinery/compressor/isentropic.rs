@@ -164,7 +164,7 @@ mod tests {
 
         let p_in = Pressure::new::<kilopascal>(100.0);
         let t_in = ThermodynamicTemperature::new::<kelvin>(300.0);
-        let inlet: State<MockGas> = thermo.state_from((t_in, p_in)).unwrap();
+        let inlet: State<MockGas> = thermo.state_from((MockGas, t_in, p_in)).unwrap();
 
         // Pick `p2/p1 = 2^7` so that `T2s = T1*(p2/p1)^((k-1)/k) = T1*(2^7)^(2/7) = 4*T1`.
         let p_out = Pressure::new::<kilopascal>(12_800.0);

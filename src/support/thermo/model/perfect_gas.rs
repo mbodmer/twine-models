@@ -445,7 +445,7 @@ mod tests {
 
         let temp = ThermodynamicTemperature::new::<degree_celsius>(50.0);
         let pres = Pressure::new::<kilopascal>(100.0);
-        let state_a: State<MockGas> = thermo.state_from((temp, pres)).unwrap();
+        let state_a: State<MockGas> = thermo.state_from((MockGas, temp, pres)).unwrap();
 
         let state_b =
             state_a.with_temperature(ThermodynamicTemperature::new::<degree_celsius>(100.0));
@@ -470,7 +470,7 @@ mod tests {
 
         let pres = Pressure::new::<psi>(100.0);
         let dens = MassDensity::new::<pound_per_cubic_foot>(0.1);
-        let state_a: State<MockGas> = thermo.state_from((pres, dens)).unwrap();
+        let state_a: State<MockGas> = thermo.state_from((MockGas, pres, dens)).unwrap();
 
         let state_b = state_a.with_density(dens * 2.0);
 
@@ -490,10 +490,10 @@ mod tests {
 
         let temp_in = ThermodynamicTemperature::new::<degree_celsius>(120.0);
         let pres_in = Pressure::new::<kilopascal>(250.0);
-        let state_in: State<MockGas> = thermo.state_from((temp_in, pres_in)).unwrap();
+        let state_in: State<MockGas> = thermo.state_from((MockGas, temp_in, pres_in)).unwrap();
 
         let h = thermo.enthalpy(&state_in)?;
-        let state_out: State<MockGas> = thermo.state_from((pres_in, h)).unwrap();
+        let state_out: State<MockGas> = thermo.state_from((MockGas, pres_in, h)).unwrap();
 
         assert_relative_eq!(
             state_out.temperature.get::<kelvin>(),
@@ -513,10 +513,10 @@ mod tests {
 
         let temp_in = ThermodynamicTemperature::new::<degree_celsius>(80.0);
         let pres_in = Pressure::new::<kilopascal>(180.0);
-        let state_in: State<MockGas> = thermo.state_from((temp_in, pres_in)).unwrap();
+        let state_in: State<MockGas> = thermo.state_from((MockGas, temp_in, pres_in)).unwrap();
 
         let s = thermo.entropy(&state_in)?;
-        let state_out: State<MockGas> = thermo.state_from((pres_in, s)).unwrap();
+        let state_out: State<MockGas> = thermo.state_from((MockGas, pres_in, s)).unwrap();
 
         assert_relative_eq!(
             state_out.temperature.get::<kelvin>(),
@@ -536,11 +536,11 @@ mod tests {
 
         let temp_in = ThermodynamicTemperature::new::<degree_celsius>(140.0);
         let pres_in = Pressure::new::<kilopascal>(220.0);
-        let state_in: State<MockGas> = thermo.state_from((temp_in, pres_in)).unwrap();
+        let state_in: State<MockGas> = thermo.state_from((MockGas, temp_in, pres_in)).unwrap();
 
         let h = thermo.enthalpy(&state_in)?;
         let s = thermo.entropy(&state_in)?;
-        let state_out: State<MockGas> = thermo.state_from((h, s)).unwrap();
+        let state_out: State<MockGas> = thermo.state_from((MockGas, h, s)).unwrap();
 
         assert_relative_eq!(
             state_out.temperature.get::<kelvin>(),

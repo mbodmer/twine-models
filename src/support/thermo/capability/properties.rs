@@ -65,3 +65,42 @@ pub trait HasCv: ThermoModel {
     /// Returns [`PropertyError`] if `cv` cannot be calculated.
     fn cv(&self, state: &State<Self::Fluid>) -> Result<SpecificHeatCapacity, PropertyError>;
 }
+
+impl<T: HasPressure> HasPressure for &T {
+    fn pressure(&self, state: &State<Self::Fluid>) -> Result<Pressure, PropertyError> {
+        T::pressure(self, state)
+    }
+}
+
+impl<T: HasInternalEnergy> HasInternalEnergy for &T {
+    fn internal_energy(
+        &self,
+        state: &State<Self::Fluid>,
+    ) -> Result<SpecificInternalEnergy, PropertyError> {
+        T::internal_energy(self, state)
+    }
+}
+
+impl<T: HasEnthalpy> HasEnthalpy for &T {
+    fn enthalpy(&self, state: &State<Self::Fluid>) -> Result<SpecificEnthalpy, PropertyError> {
+        T::enthalpy(self, state)
+    }
+}
+
+impl<T: HasEntropy> HasEntropy for &T {
+    fn entropy(&self, state: &State<Self::Fluid>) -> Result<SpecificEntropy, PropertyError> {
+        T::entropy(self, state)
+    }
+}
+
+impl<T: HasCp> HasCp for &T {
+    fn cp(&self, state: &State<Self::Fluid>) -> Result<SpecificHeatCapacity, PropertyError> {
+        T::cp(self, state)
+    }
+}
+
+impl<T: HasCv> HasCv for &T {
+    fn cv(&self, state: &State<Self::Fluid>) -> Result<SpecificHeatCapacity, PropertyError> {
+        T::cv(self, state)
+    }
+}

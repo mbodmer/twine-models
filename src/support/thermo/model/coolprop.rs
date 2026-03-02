@@ -415,7 +415,9 @@ mod tests {
 
         let state = co2_state();
         let pressure = model.pressure(&state).unwrap();
-        let roundtrip = model.state_from((state.temperature, pressure)).unwrap();
+        let roundtrip = model
+            .state_from((CarbonDioxide, state.temperature, pressure))
+            .unwrap();
 
         assert_relative_eq!(
             roundtrip.density.get::<kilogram_per_cubic_meter>(),
@@ -431,7 +433,7 @@ mod tests {
         let state = water_state();
         let pressure = model.pressure(&state).unwrap();
         let enthalpy = model.enthalpy(&state).unwrap();
-        let roundtrip = model.state_from((pressure, enthalpy)).unwrap();
+        let roundtrip = model.state_from((Water, pressure, enthalpy)).unwrap();
 
         assert_relative_eq!(
             roundtrip.temperature.get::<kelvin>(),
@@ -452,7 +454,7 @@ mod tests {
         let state = water_state();
         let pressure = model.pressure(&state).unwrap();
         let entropy = model.entropy(&state).unwrap();
-        let roundtrip = model.state_from((pressure, entropy)).unwrap();
+        let roundtrip = model.state_from((Water, pressure, entropy)).unwrap();
 
         assert_relative_eq!(
             roundtrip.temperature.get::<kelvin>(),
@@ -473,7 +475,7 @@ mod tests {
         let state = water_state();
         let enthalpy = model.enthalpy(&state).unwrap();
         let entropy = model.entropy(&state).unwrap();
-        let roundtrip = model.state_from((enthalpy, entropy)).unwrap();
+        let roundtrip = model.state_from((Water, enthalpy, entropy)).unwrap();
 
         assert_relative_eq!(
             roundtrip.temperature.get::<kelvin>(),
