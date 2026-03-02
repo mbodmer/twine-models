@@ -13,22 +13,20 @@ num-traits = "0.2"
 rfluids = { version = "0.3.0", optional = true }
 thiserror = "2.0"
 twine-core = "0.5"
-twine-observers = { version = "0.5", optional = true }
 twine-solvers = "0.5"
 uom = "0.36"
 
 [features]
 default = []
 coolprop = ["dep:rfluids"]
-plot = ["dep:twine-observers", "twine-observers/plot"]
 
 [dev-dependencies]
 approx = "0.5"
 jiff = "0.2"
+twine-observers = { version = "0.5", features = ["plot"] }
 
 [[example]]
 name = "stratified_tank"
-required-features = ["plot"]
 
 [lints.clippy]
 # Enforce `foo.rs` + `foo/` module style over `foo/mod.rs`

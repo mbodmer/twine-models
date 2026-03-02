@@ -62,7 +62,7 @@
 //! with thermostat control, a daily draw schedule, and interactive plotting:
 //!
 //! ```sh
-//! cargo run --example stratified_tank --features plot --release
+//! cargo run --example stratified_tank --release
 //! ```
 
 mod core;

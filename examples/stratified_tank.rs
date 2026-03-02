@@ -10,7 +10,7 @@
 //! Run with:
 //!
 //! ```sh
-//! cargo run --example stratified_tank --features plot --release
+//! cargo run --example stratified_tank --release
 //! ```
 
 use std::{convert::Infallible, error::Error};
@@ -210,7 +210,7 @@ fn element_heat_flow(state: SwitchState, power: Power) -> AuxHeatFlow {
 // Main
 // ---------------------------------------------------------------------------
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn build_scenario() -> Result<TankScenario, Box<dyn Error>> {
     let tank = StratifiedTank::new::<NODES>(
         Fluid {
             density: MassDensity::new::<kilogram_per_cubic_meter>(990.0),
@@ -241,7 +241,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         )?,
     ])?;
 
-    let scenario = TankScenario {
+    Ok(TankScenario {
         tank,
         draw_schedule,
         element_node: 12,
@@ -250,11 +250,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         deadband: Deadband::new(TemperatureInterval::new::<delta_celsius>(10.0))?,
         ground_temperature: ThermodynamicTemperature::new::<degree_celsius>(10.0),
         room_temperature: ThermodynamicTemperature::new::<degree_celsius>(20.0),
-    };
+    })
+}
 
-    // Initial conditions: tank cold, element off, no draw.
+/// Initial conditions: tank cold, element off, no draw.
+fn initial_input(scenario: &TankScenario) -> SimInput {
     let t_init = ThermodynamicTemperature::new::<degree_celsius>(20.0);
-    let initial = SimInput {
+    SimInput {
         tank: StratifiedTankInput {
             temperatures: [t_init; NODES],
             port_flows: [PortFlow::new(
@@ -271,8 +273,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         },
         time: DateTime::default(),
         element_state: SwitchState::Off,
-    };
+    }
+}
 
+fn run(scenario: &TankScenario) -> Result<(), Box<dyn Error>> {
+    let initial = initial_input(scenario);
     let dt = Time::new::<minute>(1.0);
     let steps = DAYS * 24 * 60;
 
@@ -286,8 +291,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     ]);
 
     euler::solve(
-        &scenario,
-        &scenario,
+        scenario,
+        scenario,
         initial,
         dt,
         steps,
@@ -338,4 +343,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?;
 
     Ok(())
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let scenario = build_scenario()?;
+    run(&scenario)
 }
