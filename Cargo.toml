@@ -18,7 +18,7 @@ twine-solvers = "0.5"
 uom = "0.36"
 
 [features]
-default = ["coolprop"]
+default = []
 coolprop = ["dep:rfluids"]
 plot = ["dep:twine-observers", "twine-observers/plot"]
 
