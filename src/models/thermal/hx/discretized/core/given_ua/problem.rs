@@ -10,7 +10,7 @@ use uom::si::{
     thermodynamic_temperature::kelvin,
 };
 
-use crate::models::thermal::hx::core::{
+use crate::models::thermal::hx::discretized::core::{
     DiscretizedHx, Given, Known, Results, SolveError,
     traits::{DiscretizedArrangement, DiscretizedHxThermoModel},
 };

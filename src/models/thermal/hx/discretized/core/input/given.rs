@@ -1,6 +1,6 @@
 use uom::si::f64::ThermodynamicTemperature;
 
-use crate::models::thermal::hx::core::HeatTransferRate;
+use crate::models::thermal::hx::discretized::core::HeatTransferRate;
 
 /// Specifies the additional constraint needed to fully define the heat exchanger.
 ///

@@ -11,7 +11,6 @@ mod problem;
 pub use config::GivenUaConfig;
 pub use error::GivenUaError;
 
-use crate::support::constraint::{Constrained, NonNegative};
 use twine_solvers::equation::{EvalError, bisection};
 use uom::{
     ConstZero,
@@ -28,7 +27,20 @@ use super::{
 
 use problem::{GivenUaModel, GivenUaProblem};
 
+/// Results from a `given_ua` solve, including the node states and iteration count.
+#[derive(Debug, Clone)]
+pub struct GivenUaResults<TopFluid, BottomFluid, const N: usize> {
+    /// Heat exchanger node states and performance metrics.
+    pub results: Results<TopFluid, BottomFluid, N>,
+
+    /// Number of bisection iterations performed.
+    pub iterations: usize,
+}
+
 /// Solves a discretized heat exchanger given a target conductance (UA).
+///
+/// Accepts bare `ThermalConductance`. Non-positive UA means no heat transfer —
+/// the solver is skipped and zero-transfer results are returned immediately.
 ///
 /// Uses bisection to iteratively find the top stream outlet temperature that
 /// achieves the specified thermal conductance.
@@ -39,11 +51,11 @@ use problem::{GivenUaModel, GivenUaProblem};
 /// or if the solver fails to converge.
 pub(super) fn given_ua<Arrangement, TopFluid, BottomFluid, const N: usize>(
     known: &Known<TopFluid, BottomFluid>,
-    target_ua: Constrained<ThermalConductance, NonNegative>,
+    target_ua: ThermalConductance,
     config: GivenUaConfig,
     thermo_top: &impl DiscretizedHxThermoModel<TopFluid>,
     thermo_bottom: &impl DiscretizedHxThermoModel<BottomFluid>,
-) -> Result<Results<TopFluid, BottomFluid, N>, GivenUaError>
+) -> Result<GivenUaResults<TopFluid, BottomFluid, N>, GivenUaError>
 where
     Arrangement: DiscretizedArrangement + Default,
     TopFluid: Clone,
@@ -56,15 +68,21 @@ where
         );
     };
 
-    let target_ua = target_ua.into_inner();
+    if target_ua < ThermalConductance::ZERO {
+        return Err(GivenUaError::NegativeUa(target_ua));
+    }
 
     if target_ua == ThermalConductance::ZERO {
-        return Ok(super::DiscretizedHx::<Arrangement, N>::solve(
+        let results = super::DiscretizedHx::<Arrangement, N>::solve(
             known,
             Given::HeatTransferRate(HeatTransferRate::None),
             thermo_top,
             thermo_bottom,
-        )?);
+        )?;
+        return Ok(GivenUaResults {
+            results,
+            iterations: 0,
+        });
     }
 
     let model = GivenUaModel::<Arrangement, _, _, _, _, N>::new(known, thermo_top, thermo_bottom);
@@ -87,21 +105,25 @@ where
         },
     )?;
 
+    let iterations = solution.iters;
+
     if solution.status != bisection::Status::Converged {
         return Err(GivenUaError::MaxIters {
             residual: ThermalConductance::new::<watt_per_kelvin>(solution.residual),
-            iters: solution.iters,
+            iters: iterations,
         });
     }
 
-    Ok(solution.snapshot.output)
+    Ok(GivenUaResults {
+        results: solution.snapshot.output,
+        iterations,
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    use crate::support::constraint::NonNegative;
     use approx::assert_relative_eq;
     use uom::si::{
         f64::{MassRate, ThermodynamicTemperature},
@@ -110,7 +132,7 @@ mod tests {
         thermodynamic_temperature::kelvin,
     };
 
-    use crate::models::thermal::hx::core::{
+    use crate::models::thermal::hx::discretized::core::{
         DiscretizedHx, Given, HeatTransferRate, Inlets, Known, MassFlows, PressureDrops,
         test_support::{TestThermoModel, state},
     };
@@ -142,7 +164,7 @@ mod tests {
 
         let result = given_ua::<CounterFlow, _, _, 5>(
             &known,
-            NonNegative::new(target.ua).unwrap(),
+            target.ua,
             GivenUaConfig::default(),
             &model,
             &model,
@@ -150,7 +172,7 @@ mod tests {
         .expect("ua solve should succeed");
 
         assert_relative_eq!(
-            result.top[4].temperature.get::<kelvin>(),
+            result.results.top[4].temperature.get::<kelvin>(),
             target.top[4].temperature.get::<kelvin>(),
             epsilon = 1e-12
         );
@@ -174,7 +196,7 @@ mod tests {
 
         let result = given_ua::<CounterFlow, _, _, 5>(
             &known,
-            NonNegative::zero(),
+            ThermalConductance::ZERO,
             GivenUaConfig::default(),
             &model,
             &model,
@@ -182,12 +204,40 @@ mod tests {
         .expect("zero ua solve should succeed");
 
         // With zero UA, no heat transfer occurs
-        assert_eq!(result.q_dot, HeatTransferRate::None);
-        assert_eq!(result.ua, ThermalConductance::ZERO);
+        assert_eq!(result.results.q_dot, HeatTransferRate::None);
+        assert_eq!(result.results.ua, ThermalConductance::ZERO);
+        assert_eq!(result.iterations, 0);
 
         // Outlet temperatures should match inlet temperatures
-        assert_relative_eq!(result.top[4].temperature.get::<kelvin>(), 400.0);
-        assert_relative_eq!(result.bottom[0].temperature.get::<kelvin>(), 300.0);
+        assert_relative_eq!(result.results.top[4].temperature.get::<kelvin>(), 400.0);
+        assert_relative_eq!(result.results.bottom[0].temperature.get::<kelvin>(), 300.0);
+    }
+
+    #[test]
+    fn negative_ua_returns_error() {
+        let model = TestThermoModel::new();
+
+        let known = Known {
+            inlets: Inlets {
+                top: state(400.0),
+                bottom: state(300.0),
+            },
+            m_dot: MassFlows::new_unchecked(
+                MassRate::new::<kilogram_per_second>(2.0),
+                MassRate::new::<kilogram_per_second>(3.0),
+            ),
+            dp: PressureDrops::default(),
+        };
+
+        let result = given_ua::<CounterFlow, _, _, 5>(
+            &known,
+            ThermalConductance::new::<watt_per_kelvin>(-1.0),
+            GivenUaConfig::default(),
+            &model,
+            &model,
+        );
+
+        assert!(matches!(result, Err(GivenUaError::NegativeUa(_))));
     }
 
     #[test]
@@ -211,13 +261,17 @@ mod tests {
 
         let result = given_ua::<CounterFlow, _, _, 5>(
             &known,
-            NonNegative::new(ThermalConductance::new::<kilowatt_per_kelvin>(2.0)).unwrap(),
+            ThermalConductance::new::<kilowatt_per_kelvin>(2.0),
             GivenUaConfig::default(),
             &model,
             &model,
         )
         .expect("solver should converge despite violations during iteration");
 
-        assert_relative_eq!(result.ua.get::<kilowatt_per_kelvin>(), 2.0, epsilon = 1e-12);
+        assert_relative_eq!(
+            result.results.ua.get::<kilowatt_per_kelvin>(),
+            2.0,
+            epsilon = 1e-12
+        );
     }
 }

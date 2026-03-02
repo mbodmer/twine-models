@@ -6,7 +6,7 @@ use crate::support::{
 };
 use uom::si::f64::{MassRate, Power, Pressure, ThermodynamicTemperature};
 
-use crate::models::thermal::hx::core::{
+use crate::models::thermal::hx::discretized::core::{
     Given, HeatTransferRate, Known, traits::DiscretizedHxThermoModel,
 };
 
@@ -273,7 +273,7 @@ mod tests {
         thermodynamic_temperature::kelvin,
     };
 
-    use crate::models::thermal::hx::core::{
+    use crate::models::thermal::hx::discretized::core::{
         Inlets, MassFlows, PressureDrops,
         test_support::{TestThermoModel, state},
     };

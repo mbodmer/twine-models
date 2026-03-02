@@ -78,7 +78,7 @@ mod tests {
         thermodynamic_temperature::kelvin,
     };
 
-    use crate::models::thermal::hx::core::{
+    use crate::models::thermal::hx::discretized::core::{
         HeatTransferRate, Inlets, MassFlows, PressureDrops,
         test_support::{TestThermoModel, state},
     };

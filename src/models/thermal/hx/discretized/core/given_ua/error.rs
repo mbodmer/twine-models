@@ -2,11 +2,15 @@ use thiserror::Error;
 use twine_solvers::equation::bisection;
 use uom::si::f64::ThermalConductance;
 
-use crate::models::thermal::hx::core::SolveError;
+use crate::models::thermal::hx::discretized::core::SolveError;
 
 /// Errors that can occur while solving given a target conductance (UA).
 #[derive(Debug, Error)]
 pub enum GivenUaError {
+    /// The target UA is negative.
+    #[error("target UA must be non-negative, got {0:?}")]
+    NegativeUa(ThermalConductance),
+
     /// A discretized heat exchanger solve failed.
     #[error("discretized solve failed")]
     Solve(#[from] SolveError),

@@ -1,4 +1,4 @@
-use crate::models::thermal::hx::core::{Inlets, MassFlows, PressureDrops};
+use crate::models::thermal::hx::discretized::core::{Inlets, MassFlows, PressureDrops};
 
 /// Core inputs for a discretized heat exchanger.
 ///

@@ -12,7 +12,9 @@ use crate::support::{
 };
 use uom::si::f64::{Power, Pressure};
 
-use crate::models::thermal::hx::core::traits::{DiscretizedArrangement, DiscretizedHxThermoModel};
+use crate::models::thermal::hx::discretized::core::traits::{
+    DiscretizedArrangement, DiscretizedHxThermoModel,
+};
 
 use super::{Resolved, SolveError};
 
@@ -235,7 +237,7 @@ mod tests {
         thermodynamic_temperature::kelvin,
     };
 
-    use crate::models::thermal::hx::core::{
+    use crate::models::thermal::hx::discretized::core::{
         Given, HeatTransferRate, Inlets, Known, MassFlows, PressureDrops,
         test_support::{TestThermoModel, state},
     };

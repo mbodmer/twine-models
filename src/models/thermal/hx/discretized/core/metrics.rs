@@ -178,7 +178,7 @@ mod tests {
 
     use uom::si::{f64::MassRate, mass_rate::kilogram_per_second};
 
-    use crate::models::thermal::hx::core::{
+    use crate::models::thermal::hx::discretized::core::{
         Given, HeatTransferRate, Inlets, Known, MassFlows, PressureDrops,
         solve::Resolved,
         test_support::{TestThermoModel, state},

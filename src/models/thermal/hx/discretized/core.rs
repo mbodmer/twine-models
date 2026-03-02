@@ -19,20 +19,20 @@ mod traits;
 #[cfg(test)]
 mod test_support;
 
-pub use given_ua::{GivenUaConfig, GivenUaError};
+pub use given_ua::{GivenUaConfig, GivenUaError, GivenUaResults};
 pub use heat_transfer_rate::HeatTransferRate;
 pub use input::{Given, Inlets, Known, MassFlows, PressureDrops};
 pub use results::{MinDeltaT, Results};
 pub use solve::SolveError;
+pub(crate) use traits::DiscretizedHxThermoModel;
 
 use std::marker::PhantomData;
 
-use crate::support::constraint::{Constrained, NonNegative};
 use uom::si::f64::ThermalConductance;
 
 use given_ua::given_ua;
 use solve::solve;
-use traits::{DiscretizedArrangement, DiscretizedHxThermoModel};
+use traits::DiscretizedArrangement;
 
 /// Entry point for solving a discretized heat exchanger.
 ///
@@ -46,7 +46,7 @@ use traits::{DiscretizedArrangement, DiscretizedHxThermoModel};
 /// This constraint is enforced at compile time via const assertions.
 ///
 /// ```compile_fail
-/// # use twine_models::models::thermal::hx::core::{DiscretizedHx, ParallelFlow};
+/// # use twine_models::models::thermal::hx::discretized::core::DiscretizedHx;
 /// # use twine_models::support::hx::arrangement::ParallelFlow;
 /// // This will fail to compile: N must be >= 2
 /// let _ = DiscretizedHx::<ParallelFlow, 1>::solve(todo!(), todo!(), todo!(), todo!());
@@ -97,6 +97,9 @@ impl<Arrangement, const N: usize> DiscretizedHx<Arrangement, N> {
 
     /// Solves a discretized heat exchanger given a target conductance (UA).
     ///
+    /// Accepts bare `ThermalConductance`. Non-positive values skip the solve and
+    /// return zero-transfer results immediately.
+    ///
     /// Iterates on the top outlet temperature to achieve the specified
     /// thermal conductance.
     ///
@@ -106,11 +109,11 @@ impl<Arrangement, const N: usize> DiscretizedHx<Arrangement, N> {
     /// or if the solver fails to converge.
     pub fn given_ua<TopFluid, BottomFluid>(
         known: &Known<TopFluid, BottomFluid>,
-        target_ua: Constrained<ThermalConductance, NonNegative>,
+        target_ua: ThermalConductance,
         config: GivenUaConfig,
         thermo_top: &impl DiscretizedHxThermoModel<TopFluid>,
         thermo_bottom: &impl DiscretizedHxThermoModel<BottomFluid>,
-    ) -> Result<Results<TopFluid, BottomFluid, N>, GivenUaError>
+    ) -> Result<GivenUaResults<TopFluid, BottomFluid, N>, GivenUaError>
     where
         Arrangement: DiscretizedArrangement + Default,
         TopFluid: Clone,
@@ -129,10 +132,10 @@ impl<Arrangement, const N: usize> DiscretizedHx<Arrangement, N> {
     /// or if the solver fails to converge.
     pub fn given_ua_same<Fluid, Model>(
         known: &Known<Fluid, Fluid>,
-        target_ua: Constrained<ThermalConductance, NonNegative>,
+        target_ua: ThermalConductance,
         config: GivenUaConfig,
         thermo: &Model,
-    ) -> Result<Results<Fluid, Fluid, N>, GivenUaError>
+    ) -> Result<GivenUaResults<Fluid, Fluid, N>, GivenUaError>
     where
         Arrangement: DiscretizedArrangement + Default,
         Fluid: Clone,

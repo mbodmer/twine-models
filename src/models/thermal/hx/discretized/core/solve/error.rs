@@ -4,7 +4,7 @@ use uom::{
     si::f64::{Power, TemperatureInterval, ThermodynamicTemperature},
 };
 
-use crate::models::thermal::hx::core::{HeatTransferRate, MinDeltaT};
+use crate::models::thermal::hx::discretized::core::{HeatTransferRate, MinDeltaT};
 
 use super::Resolved;
 
