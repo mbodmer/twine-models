@@ -1,5 +1,13 @@
 //! CoolProp-backed fluid property model.
 
+// CoolProp uses C++ exceptions which require Emscripten's runtime.
+// The `wasm32-unknown-unknown` target cannot provide this.
+#[cfg(all(target_arch = "wasm32", not(target_os = "emscripten")))]
+compile_error!(
+    "CoolProp requires Emscripten for WASM builds. \
+     Use target `wasm32-unknown-emscripten`, not `wasm32-unknown-unknown`."
+);
+
 mod error;
 mod ffi;
 mod wrapper;

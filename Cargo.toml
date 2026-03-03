@@ -29,6 +29,8 @@ coolprop-static = ["dep:cmake"]
 [dev-dependencies]
 approx = "0.5"
 jiff = "0.2"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 twine-observers = { version = "0.5", features = ["plot"] }
 
 [build-dependencies]
