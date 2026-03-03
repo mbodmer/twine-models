@@ -431,4 +431,170 @@ mod tests {
             "expected NegativeUa error",
         );
     }
+
+    #[cfg(any(feature = "coolprop-static", feature = "coolprop-dylib"))]
+    mod coolprop_tests {
+        use super::*;
+
+        use crate::support::thermo::{
+            capability::StateFrom, fluid::CarbonDioxide, model::CoolProp,
+        };
+        use uom::si::{
+            f64::{Pressure, ThermodynamicTemperature},
+            pressure::{megapascal, pascal},
+            thermal_conductance::kilowatt_per_kelvin,
+            thermodynamic_temperature::degree_celsius,
+        };
+
+        #[test]
+        fn co2_five_segments_at_atmospheric_pressure() {
+            let thermo = CoolProp::<CarbonDioxide>::new().unwrap();
+
+            let atm = Pressure::new::<pascal>(101_325.0);
+
+            let cold_inlet = thermo
+                .state_from((
+                    CarbonDioxide,
+                    ThermodynamicTemperature::new::<degree_celsius>(25.0),
+                    atm,
+                ))
+                .unwrap();
+            let hot_inlet = thermo
+                .state_from((
+                    CarbonDioxide,
+                    ThermodynamicTemperature::new::<degree_celsius>(300.0),
+                    atm,
+                ))
+                .unwrap();
+
+            let recuperator = Recuperator::new(&thermo, 5, RecuperatorConfig::default()).unwrap();
+
+            let result = recuperator
+                .call(&RecuperatorInput {
+                    inlets: Inlets {
+                        top: cold_inlet,
+                        bottom: hot_inlet,
+                    },
+                    mass_flows: MassFlows::new_unchecked(
+                        MassRate::new::<kilogram_per_second>(1.0),
+                        MassRate::new::<kilogram_per_second>(1.0),
+                    ),
+                    pressure_drops: PressureDrops::zero(),
+                    ua: ThermalConductance::new::<watt_per_kelvin>(500.0),
+                })
+                .unwrap();
+
+            assert!(
+                result.top_outlet.temperature > cold_inlet.temperature,
+                "cold side should be heated",
+            );
+            assert!(
+                result.bottom_outlet.temperature < hot_inlet.temperature,
+                "hot side should be cooled",
+            );
+        }
+
+        #[test]
+        fn co2_five_segments_at_sco2_power_cycle_conditions() {
+            let thermo = CoolProp::<CarbonDioxide>::new().unwrap();
+
+            // Typical sCO2 recuperator conditions:
+            // Cold side: compressor outlet ~180°C at ~20 MPa
+            // Hot side: turbine outlet ~380°C at ~8 MPa
+            let cold_inlet = thermo
+                .state_from((
+                    CarbonDioxide,
+                    ThermodynamicTemperature::new::<degree_celsius>(180.0),
+                    Pressure::new::<megapascal>(20.0),
+                ))
+                .unwrap();
+            let hot_inlet = thermo
+                .state_from((
+                    CarbonDioxide,
+                    ThermodynamicTemperature::new::<degree_celsius>(380.0),
+                    Pressure::new::<megapascal>(8.0),
+                ))
+                .unwrap();
+
+            let recuperator = Recuperator::new(&thermo, 5, RecuperatorConfig::default()).unwrap();
+
+            let result = recuperator
+                .call(&RecuperatorInput {
+                    inlets: Inlets {
+                        top: cold_inlet,
+                        bottom: hot_inlet,
+                    },
+                    mass_flows: MassFlows::new_unchecked(
+                        MassRate::new::<kilogram_per_second>(1.0),
+                        MassRate::new::<kilogram_per_second>(1.0),
+                    ),
+                    pressure_drops: PressureDrops::zero(),
+                    ua: ThermalConductance::new::<watt_per_kelvin>(2000.0),
+                })
+                .unwrap();
+
+            assert!(
+                result.top_outlet.temperature > cold_inlet.temperature,
+                "cold side should be heated",
+            );
+            assert!(
+                result.bottom_outlet.temperature < hot_inlet.temperature,
+                "hot side should be cooled",
+            );
+        }
+
+        /// Reproduces the conditions from issue #58: sCO₂ near the critical
+        /// point (32 °C / 8 `MPa` compressor inlet) with multiple segments.
+        /// Cold side approximates compressor outlet, hot side approximates
+        /// turbine outlet for a simple recuperated Brayton cycle.
+        #[test]
+        fn co2_five_segments_near_critical_point() {
+            let thermo = CoolProp::<CarbonDioxide>::new().unwrap();
+
+            // Cold side: compressor outlet ~80°C at ~20 MPa
+            // (compressor inlet 32°C / 8 MPa, ~2.5 pressure ratio)
+            let cold_inlet = thermo
+                .state_from((
+                    CarbonDioxide,
+                    ThermodynamicTemperature::new::<degree_celsius>(80.0),
+                    Pressure::new::<megapascal>(20.0),
+                ))
+                .unwrap();
+
+            // Hot side: turbine outlet ~400°C at ~8 MPa
+            let hot_inlet = thermo
+                .state_from((
+                    CarbonDioxide,
+                    ThermodynamicTemperature::new::<degree_celsius>(400.0),
+                    Pressure::new::<megapascal>(8.0),
+                ))
+                .unwrap();
+
+            let recuperator = Recuperator::new(&thermo, 5, RecuperatorConfig::default()).unwrap();
+
+            let result = recuperator
+                .call(&RecuperatorInput {
+                    inlets: Inlets {
+                        top: cold_inlet,
+                        bottom: hot_inlet,
+                    },
+                    mass_flows: MassFlows::new_unchecked(
+                        MassRate::new::<kilogram_per_second>(1.0),
+                        MassRate::new::<kilogram_per_second>(1.0),
+                    ),
+                    pressure_drops: PressureDrops::zero(),
+                    ua: ThermalConductance::new::<kilowatt_per_kelvin>(2000.0),
+                })
+                .unwrap();
+
+            assert!(
+                result.top_outlet.temperature > cold_inlet.temperature,
+                "cold side should be heated",
+            );
+            assert!(
+                result.bottom_outlet.temperature < hot_inlet.temperature,
+                "hot side should be cooled",
+            );
+        }
+    }
 }

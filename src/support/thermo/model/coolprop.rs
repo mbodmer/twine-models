@@ -44,7 +44,7 @@ pub use error::CoolPropError;
 /// Trait used to mark fluids as usable with the [`CoolProp`] model.
 ///
 /// Implementors provide the backend and fluid identifiers needed to construct a
-/// CoolProp `AbstractState`.
+/// `CoolProp` `AbstractState`.
 pub trait CoolPropFluid: Default + Send + Sync + 'static {
     const BACKEND: &'static str;
     const NAME: &'static str;
@@ -302,6 +302,9 @@ const _: () = {
     }
 };
 
+// Exact `assert_eq!` on f64 is intentional in the spot-check tests —
+// they verify bit-for-bit reproducibility across CoolProp builds.
+#[allow(clippy::float_cmp)]
 #[cfg(test)]
 mod tests {
     use super::*;

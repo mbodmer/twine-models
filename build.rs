@@ -189,7 +189,7 @@ mod coolprop_static {
 
 #[cfg(feature = "coolprop-dylib")]
 mod coolprop_dylib {
-    /// Tell the linker to link against the prebuilt CoolProp shared library.
+    /// Tell the linker to link against the prebuilt `CoolProp` shared library.
     ///
     /// The library search path is already provided by the platform-specific
     /// `coolprop-sys-*` dependency crate. We only need to emit the link

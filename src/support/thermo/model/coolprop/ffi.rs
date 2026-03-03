@@ -1,4 +1,4 @@
-//! Raw FFI bindings to the CoolProp C API.
+//! Raw FFI bindings to the `CoolProp` C API.
 //!
 //! This module declares the four `AbstractState_*` functions used from
 //! `CoolPropLib.h`, plus typed constants for input pairs and output parameters.
@@ -41,7 +41,7 @@ unsafe extern "C" {
 
     /// Query a single output parameter from the current state.
     ///
-    /// Returns `f64::MAX` (HUGE_VAL equivalent) on failure; check `errcode`.
+    /// Returns `f64::MAX` (`HUGE_VAL` equivalent) on failure; check `errcode`.
     pub fn AbstractState_keyed_output(
         handle: c_long,
         param: c_long,

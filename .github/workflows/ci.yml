@@ -24,7 +24,14 @@ jobs:
         run: cargo fmt --check
 
       - name: Run Clippy
-        run: cargo clippy --all-targets -- -W clippy::pedantic -D warnings
+        run: cargo clippy --features coolprop-dylib --all-targets -- -W clippy::pedantic -D warnings
 
       - name: Run tests
-        run: cargo test
+        run: |
+          # TODO: Remove once https://github.com/portyanikhin/rfluids/pull/29 is
+          # released. The coolprop-sys-linux-x86-64 build script copies
+          # libCoolProp.so into OUT_DIR but the library's SONAME is
+          # libCoolProp.so.7, so the runtime linker can't find it.
+          COOLPROP_OUT_DIR=$(find target/debug/build -path '*/coolprop-sys-linux-x86-64-*/out' -type d)
+          ln -sf libCoolProp.so "$COOLPROP_OUT_DIR/libCoolProp.so.7"
+          cargo test --features coolprop-dylib

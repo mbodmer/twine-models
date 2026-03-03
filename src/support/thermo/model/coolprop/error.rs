@@ -10,7 +10,7 @@ use super::wrapper::WrapperError;
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum CoolPropError {
-    /// An error reported by the CoolProp C API.
+    /// An error reported by the `CoolProp` C API.
     #[error("{0}")]
     CoolProp(String),
 
@@ -42,9 +42,9 @@ impl From<CoolPropError> for PropertyError {
     }
 }
 
-/// Maps a CoolProp error message to a [`PropertyError`] variant.
+/// Maps a `CoolProp` error message to a [`PropertyError`] variant.
 ///
-/// CoolProp errors are opaque strings with no structured error codes. This
+/// `CoolProp` errors are opaque strings with no structured error codes. This
 /// function classifies them into [`PropertyError`] variants via substring
 /// matching on a best-effort basis.
 ///

@@ -1,4 +1,4 @@
-//! Safe Rust wrapper around a CoolProp `AbstractState` handle.
+//! Safe Rust wrapper around a `CoolProp` `AbstractState` handle.
 
 use std::{
     ffi::{CString, NulError},
@@ -8,12 +8,12 @@ use std::{
 
 use super::ffi::{self, InputPair, OutputParam};
 
-/// Size of the error message buffer passed to every CoolProp C API call.
+/// Size of the error message buffer passed to every `CoolProp` C API call.
 const MSG_BUF_LEN: usize = 512;
 
-/// Global mutex that serializes all CoolProp C API calls.
+/// Global mutex that serializes all `CoolProp` C API calls.
 ///
-/// CoolProp does not document thread-safety guarantees for its C API.
+/// `CoolProp` does not document thread-safety guarantees for its C API.
 /// Source inspection (v7.2.0) suggests per-handle operations are independent
 /// — the handle manager has its own mutex, and `update`/`keyed_output` operate
 /// on per-instance C++ objects — but the flash routines and Helmholtz backends
@@ -27,11 +27,11 @@ const MSG_BUF_LEN: usize = 512;
 /// handle.
 static COOLPROP_LOCK: Mutex<()> = Mutex::new(());
 
-/// A safe owner of a CoolProp `AbstractState` handle.
+/// A safe owner of a `CoolProp` `AbstractState` handle.
 ///
-/// Calls `AbstractState_factory` on construction and `AbstractState_free` on
-/// drop. All methods return `Result`, converting CoolProp error strings into
-/// [`WrapperError`].
+/// Calls `AbstractState_factory` on construction and `AbstractState_free` on drop.
+/// All methods return `Result`, converting `CoolProp` error strings
+/// into [`WrapperError`].
 pub struct AbstractState {
     handle: c_long,
 }
@@ -44,7 +44,7 @@ pub enum WrapperError {
     #[error("invalid C string argument: {0}")]
     InvalidCString(#[from] NulError),
 
-    /// CoolProp reported a non-zero error code.
+    /// `CoolProp` reported a non-zero error code.
     #[error("{0}")]
     CoolProp(String),
 }
@@ -55,7 +55,7 @@ impl AbstractState {
     /// # Errors
     ///
     /// Returns [`WrapperError`] if either string contains an interior null or
-    /// if CoolProp rejects the backend/fluid combination.
+    /// if `CoolProp` rejects the backend/fluid combination.
     pub fn new(backend: &str, fluid: &str) -> Result<Self, WrapperError> {
         let backend_c = CString::new(backend)?;
         let fluid_c = CString::new(fluid)?;
@@ -63,7 +63,9 @@ impl AbstractState {
         let mut errcode: c_long = 0;
         let mut buf = [0u8; MSG_BUF_LEN];
 
-        let _guard = COOLPROP_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = COOLPROP_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
 
         // SAFETY: pointers are valid for the duration of the call; the global
         // lock ensures no concurrent CoolProp FFI call is in progress.
@@ -71,9 +73,9 @@ impl AbstractState {
             ffi::AbstractState_factory(
                 backend_c.as_ptr(),
                 fluid_c.as_ptr(),
-                &mut errcode,
+                &raw mut errcode,
                 buf.as_mut_ptr().cast::<c_char>(),
-                MSG_BUF_LEN as c_long,
+                c_long::try_from(MSG_BUF_LEN).expect("buffer length fits c_long"),
             )
         };
 
@@ -88,12 +90,14 @@ impl AbstractState {
     ///
     /// # Errors
     ///
-    /// Returns [`WrapperError::CoolProp`] if CoolProp rejects the state.
+    /// Returns [`WrapperError::CoolProp`] if `CoolProp` rejects the state.
     pub fn update(&mut self, pair: InputPair, v1: f64, v2: f64) -> Result<(), WrapperError> {
         let mut errcode: c_long = 0;
         let mut buf = [0u8; MSG_BUF_LEN];
 
-        let _guard = COOLPROP_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = COOLPROP_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
 
         // SAFETY: handle is valid; buffer is alive for the call duration;
         // the global lock prevents concurrent FFI calls.
@@ -103,9 +107,9 @@ impl AbstractState {
                 pair.as_c_long(),
                 v1,
                 v2,
-                &mut errcode,
+                &raw mut errcode,
                 buf.as_mut_ptr().cast::<c_char>(),
-                MSG_BUF_LEN as c_long,
+                c_long::try_from(MSG_BUF_LEN).expect("buffer length fits c_long"),
             );
         }
 
@@ -123,12 +127,14 @@ impl AbstractState {
     ///
     /// # Errors
     ///
-    /// Returns [`WrapperError::CoolProp`] if CoolProp signals an error.
+    /// Returns [`WrapperError::CoolProp`] if `CoolProp` signals an error.
     pub fn keyed_output(&self, param: OutputParam) -> Result<f64, WrapperError> {
         let mut errcode: c_long = 0;
         let mut buf = [0u8; MSG_BUF_LEN];
 
-        let _guard = COOLPROP_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = COOLPROP_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
 
         // SAFETY: handle is valid; buffer is alive for the call duration;
         // the global lock prevents concurrent FFI calls.
@@ -136,9 +142,9 @@ impl AbstractState {
             ffi::AbstractState_keyed_output(
                 self.handle,
                 param.as_c_long(),
-                &mut errcode,
+                &raw mut errcode,
                 buf.as_mut_ptr().cast::<c_char>(),
-                MSG_BUF_LEN as c_long,
+                c_long::try_from(MSG_BUF_LEN).expect("buffer length fits c_long"),
             )
         };
 
@@ -155,7 +161,9 @@ impl Drop for AbstractState {
         let mut errcode: c_long = 0;
         let mut buf = [0u8; MSG_BUF_LEN];
 
-        let _guard = COOLPROP_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = COOLPROP_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
 
         // SAFETY: handle is valid; the global lock prevents concurrent FFI
         // calls. Errors during drop are silently discarded — there is no clean
@@ -163,9 +171,9 @@ impl Drop for AbstractState {
         unsafe {
             ffi::AbstractState_free(
                 self.handle,
-                &mut errcode,
+                &raw mut errcode,
                 buf.as_mut_ptr().cast::<c_char>(),
-                MSG_BUF_LEN as c_long,
+                c_long::try_from(MSG_BUF_LEN).expect("buffer length fits c_long"),
             );
         }
     }

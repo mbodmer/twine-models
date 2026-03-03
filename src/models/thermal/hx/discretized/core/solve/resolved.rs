@@ -1,10 +1,29 @@
 //! Resolution of boundary conditions to determine heat exchanger endpoints.
 
+/// Relative tolerance for treating enthalpy differences as zero.
+///
+/// When the enthalpy change across a stream is smaller than this fraction
+/// of the inlet enthalpy, the heat transfer is treated as zero.
+/// This prevents floating-point noise in real-gas property evaluations
+/// from being misclassified as directional heat flow, which would cause
+/// spurious second-law violations in the solver.
+///
+/// **Limitation:** this threshold scales with `h_in`, so it weakens when
+/// `h_in` is near zero. Since enthalpy is defined relative to an arbitrary
+/// reference state, there is no fully general fix — an absolute threshold
+/// would have the same problem in a different reference frame. If a future
+/// fluid's reference state places inlet enthalpies near zero and the solver
+/// starts producing spurious second-law violations, this is the place to revisit.
+const ENTHALPY_RELATIVE_ZERO: f64 = 1e-12;
+
 use crate::support::{
     thermo::State,
     units::{SpecificEnthalpy, TemperatureDifference},
 };
-use uom::si::f64::{MassRate, Power, Pressure, ThermodynamicTemperature};
+use uom::{
+    ConstZero,
+    si::f64::{MassRate, Power, Pressure, ThermodynamicTemperature},
+};
 
 use crate::models::thermal::hx::discretized::core::{
     Given, HeatTransferRate, Known, traits::DiscretizedHxThermoModel,
@@ -154,7 +173,12 @@ impl<TopFluid: Clone, BottomFluid: Clone> ResolveContext<TopFluid, BottomFluid> 
             .enthalpy(&top_out)
             .map_err(|err| SolveError::thermo_failed("enthalpy(top outlet)", err))?;
 
-        let q_signed = top.m_dot * (top.h_in - h_top_out);
+        let delta_h = top.h_in - h_top_out;
+        let q_signed = if delta_h.abs() < top.h_in.abs() * ENTHALPY_RELATIVE_ZERO {
+            Power::ZERO
+        } else {
+            top.m_dot * delta_h
+        };
         let q_dot = heat_transfer_rate_from_signed(
             top.inlet.temperature,
             bottom.inlet.temperature,
@@ -192,7 +216,12 @@ impl<TopFluid: Clone, BottomFluid: Clone> ResolveContext<TopFluid, BottomFluid> 
             .enthalpy(&bottom_out)
             .map_err(|err| SolveError::thermo_failed("enthalpy(bottom outlet)", err))?;
 
-        let q_signed = bottom.m_dot * (h_bottom_out - bottom.h_in);
+        let delta_h = h_bottom_out - bottom.h_in;
+        let q_signed = if delta_h.abs() < bottom.h_in.abs() * ENTHALPY_RELATIVE_ZERO {
+            Power::ZERO
+        } else {
+            bottom.m_dot * delta_h
+        };
         let q_dot = heat_transfer_rate_from_signed(
             top.inlet.temperature,
             bottom.inlet.temperature,
