@@ -386,21 +386,24 @@ fn node_ua<const N: usize>(
 ) -> Adjacent<ThermalConductance> {
     let node = node_geometries[i];
 
+    let (ua_bot, ua_side, ua_top) = match insulation {
+        Insulation::Adiabatic => (
+            ThermalConductance::ZERO,
+            ThermalConductance::ZERO,
+            ThermalConductance::ZERO,
+        ),
+        Insulation::Conductive { bottom, side, top } => (bottom, side, top),
+    };
+
     Adjacent {
         bottom: if i == 0 {
-            match insulation {
-                Insulation::Adiabatic => ThermalConductance::ZERO,
-            }
+            ua_bot
         } else {
             ua_between_nodes(k, node_geometries[i - 1], node)
         },
-        side: match insulation {
-            Insulation::Adiabatic => ThermalConductance::ZERO,
-        },
+        side: ua_side,
         top: if i == n - 1 {
-            match insulation {
-                Insulation::Adiabatic => ThermalConductance::ZERO,
-            }
+            ua_top
         } else {
             ua_between_nodes(k, node, node_geometries[i + 1])
         },
@@ -516,5 +519,94 @@ mod tests {
         assert_relative_eq!(k_per_s(out.derivatives[0]), 0.0);
         assert_relative_eq!(k_per_s(out.derivatives[1]), 0.0);
         assert_relative_eq!(k_per_s(out.derivatives[2]), 0.005);
+    }
+
+    #[test]
+    fn insulation_type_affects_thermal_response() {
+        use uom::si::{
+            f64::{Length, ThermalConductance, ThermodynamicTemperature},
+            length::meter,
+            thermal_conductance::kilowatt_per_kelvin,
+        };
+
+        let fluid = Fluid {
+            density: MassDensity::new::<kilogram_per_cubic_meter>(1000.0),
+            specific_heat: SpecificHeatCapacity::new::<kilojoule_per_kilogram_kelvin>(4.0),
+            thermal_conductivity: ThermalConductivity::ZERO,
+        };
+
+        let geometry = Geometry::VerticalCylinder {
+            diameter: Length::new::<meter>((4.0 / PI).sqrt()),
+            height: Length::new::<meter>(3.0),
+        };
+
+        let aux_locations = [Location::tank_top()];
+        let port_locations = [PortLocation {
+            inlet: Location::tank_bottom(),
+            outlet: Location::tank_top(),
+        }];
+
+        // Create two identical tanks with different insulation
+        let ua = ThermalConductance::new::<kilowatt_per_kelvin>(2.0);
+        let insulation_adiabatic = Insulation::Adiabatic;
+        let insulation_conductive = Insulation::conductive(ua, ua, ua);
+
+        let tank_adiabatic = StratifiedTank::new(
+            fluid,
+            geometry.clone(),
+            insulation_adiabatic,
+            aux_locations,
+            port_locations,
+        )
+        .unwrap();
+        let tank_conductive = StratifiedTank::new(
+            fluid,
+            geometry.clone(),
+            insulation_conductive,
+            aux_locations,
+            port_locations,
+        )
+        .unwrap();
+
+        // Setup identical inputs with environmental temperature gradient
+        let t_hot = ThermodynamicTemperature::new::<degree_celsius>(50.0);
+        let t_cold = ThermodynamicTemperature::new::<degree_celsius>(10.0);
+
+        let input = StratifiedTankInput {
+            temperatures: [t_hot; 3],
+            port_flows: zero_port_flows(),
+            aux_heat_flows: [AuxHeatFlow::None],
+            environment: Environment {
+                bottom: t_cold,
+                side: t_cold,
+                top: t_cold,
+            },
+        };
+
+        // Evaluate both tanks
+        let out_adiabatic = tank_adiabatic.evaluate(&input);
+        let out_conductive = tank_conductive.evaluate(&input);
+
+        // Adiabatic tank should have zero derivatives (no heat loss)
+        for deriv in out_adiabatic.derivatives {
+            assert_relative_eq!(k_per_s(deriv), 0.0, max_relative = 1e-10);
+        }
+
+        // Conductive tank: heat loss through external insulation
+        // With k=0 for fluid, internal node-to-node conduction is zero.
+        // Only external surfaces conduct to environment.
+        // dT/dt = UA_ext * ΔT * inv_heat_capacity
+        // inv_heat_capacity = 1 / (V * rho * cp) = 1 / (1 * 1000 * 4) = 0.00025 K/kJ
+        // ΔT = 50°C - 10°C = 40 K
+        //
+        // Node 0 (bottom): bottom + side are external
+        //   dT/dt = (2.0 + 2.0) * 40 * 0.00025 = -0.04 K/s
+        // Node 1 (middle): only side is external
+        //   dT/dt = 2.0 * 40 * 0.00025 = -0.02 K/s
+        // Node 2 (top): side + top are external
+        //   dT/dt = (2.0 + 2.0) * 40 * 0.00025 = -0.04 K/s
+        assert_relative_eq!(k_per_s(out_conductive.derivatives[0]), -0.04);
+        assert_relative_eq!(k_per_s(out_conductive.derivatives[1]), -0.02);
+        assert_relative_eq!(k_per_s(out_conductive.derivatives[2]), -0.04);
     }
 }
