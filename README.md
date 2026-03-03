@@ -27,14 +27,41 @@ See the [crate docs](https://docs.rs/twine-models) for details on each module.
 
 ## Feature flags
 
-| Feature    | What it enables                                    | Default |
-|------------|----------------------------------------------------|---------|
-| `coolprop` | `support::thermo::model::CoolProp` (via `rfluids`) | no      |
+| Feature          | What it enables                                          | Default |
+|------------------|----------------------------------------------------------|---------|
+| `coolprop-dylib` | `CoolProp` model via prebuilt shared library             | no      |
+| `coolprop-static`| `CoolProp` model compiled from source (cmake + vendored) | no      |
 
-Opt in via `Cargo.toml`:
+The two CoolProp features are mutually exclusive.
+
+### `coolprop-dylib`
+
+Links against prebuilt shared libraries from platform-specific `coolprop-sys-*` crates.
+Fast builds, good for local development. Works from crates.io.
 
 ```toml
-twine-models = { version = "0.1", features = ["coolprop"] }
+twine-models = { version = "0.2", features = ["coolprop-dylib"] }
+```
+
+### `coolprop-static`
+
+Compiles CoolProp from source as a static library via cmake.
+Slower first build (cached after), but self-contained.
+Works for native, Python wheels, and WASM (`wasm32-unknown-emscripten`).
+
+**Requires a git clone with submodules** — the CoolProp source tree (~240MB) exceeds
+crates.io's package size limit, so this feature is not available from a crates.io install.
+
+```sh
+git clone --recurse-submodules https://github.com/isentropic-dev/twine-models
+```
+
+For WASM builds, the Emscripten SDK must be installed with `em-config` on PATH:
+
+```sh
+brew install emscripten        # macOS
+rustup target add wasm32-unknown-emscripten
+cargo test --target wasm32-unknown-emscripten --features coolprop-static --tests
 ```
 
 ## Examples

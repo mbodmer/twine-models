@@ -1,12 +1,13 @@
 [package]
 name = "twine-models"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 authors = ["Isentropic Development <info@isentropic.dev>"]
 license = "MIT"
 repository = "https://github.com/isentropic-dev/twine-models"
 readme = "README.md"
 description = "Domain-specific models and model-building tools for Twine"
+exclude = ["vendor/"]
 
 [dependencies]
 num-traits = "0.2"
