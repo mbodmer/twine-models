@@ -4,14 +4,25 @@ use thiserror::Error;
 
 use crate::support::thermo::PropertyError;
 
+use super::wrapper::WrapperError;
+
 /// Errors returned by the [`CoolProp`](super::CoolProp) model.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum CoolPropError {
-    #[error(transparent)]
-    Rfluids(#[from] rfluids::native::CoolPropError),
+    /// An error reported by the CoolProp C API.
+    #[error("{0}")]
+    CoolProp(String),
+
+    /// The internal `AbstractState` mutex was poisoned.
     #[error("CoolProp abstract state mutex poisoned")]
     Poisoned,
+}
+
+impl From<WrapperError> for CoolPropError {
+    fn from(e: WrapperError) -> Self {
+        CoolPropError::CoolProp(e.to_string())
+    }
 }
 
 impl<T> From<PoisonError<T>> for CoolPropError {
@@ -23,7 +34,7 @@ impl<T> From<PoisonError<T>> for CoolPropError {
 impl From<CoolPropError> for PropertyError {
     fn from(error: CoolPropError) -> Self {
         match error {
-            CoolPropError::Rfluids(message) => map_error_message(&message.to_string()),
+            CoolPropError::CoolProp(message) => map_error_message(&message),
             CoolPropError::Poisoned => PropertyError::Calculation {
                 context: "CoolProp abstract state mutex poisoned".to_string(),
             },
@@ -31,15 +42,14 @@ impl From<CoolPropError> for PropertyError {
     }
 }
 
-/// Maps an `rfluids` error message to a [`PropertyError`] variant.
+/// Maps a CoolProp error message to a [`PropertyError`] variant.
 ///
-/// The `rfluids` crate exposes `CoolProp` errors as opaque strings with no
-/// structured error codes. This function uses substring matching to classify
-/// errors into appropriate [`PropertyError`] variants on a best-effort basis.
+/// CoolProp errors are opaque strings with no structured error codes. This
+/// function classifies them into [`PropertyError`] variants via substring
+/// matching on a best-effort basis.
 ///
-/// If the message doesn't match any known pattern, it falls back to
-/// [`PropertyError::Calculation`], preserving the original message for
-/// debugging.
+/// Unrecognised messages fall back to [`PropertyError::Calculation`],
+/// preserving the original text for debugging.
 fn map_error_message(message: &str) -> PropertyError {
     const UNDEFINED_MARKERS: &[&str] = &["not defined"];
     const OUT_OF_DOMAIN_MARKERS: &[&str] = &[

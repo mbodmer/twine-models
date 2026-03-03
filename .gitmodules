@@ -1,0 +1,3 @@
+[submodule "vendor/CoolProp"]
+	path = vendor/CoolProp
+	url = https://github.com/CoolProp/CoolProp.git

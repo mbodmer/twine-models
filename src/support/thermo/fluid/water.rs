@@ -9,6 +9,9 @@ use crate::support::thermo::model::incompressible::{
     IncompressibleFluid, IncompressibleParameters,
 };
 
+#[cfg(feature = "coolprop-static")]
+use crate::support::thermo::model::coolprop::CoolPropFluid;
+
 /// Canonical identifier for water.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Water;
@@ -30,8 +33,8 @@ impl StepIntegrable<Time> for Water {
     }
 }
 
-#[cfg(feature = "coolprop")]
-impl crate::support::thermo::model::coolprop::CoolPropFluid for Water {
+#[cfg(feature = "coolprop-static")]
+impl CoolPropFluid for Water {
     const BACKEND: &'static str = "HEOS";
     const NAME: &'static str = "Water";
 }

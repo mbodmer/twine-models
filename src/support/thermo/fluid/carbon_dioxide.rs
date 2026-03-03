@@ -7,6 +7,9 @@ use uom::si::{
 use crate::support::thermo::model::perfect_gas::{PerfectGasFluid, PerfectGasParameters};
 use crate::support::units::SpecificGasConstant;
 
+#[cfg(feature = "coolprop-static")]
+use crate::support::thermo::model::coolprop::CoolPropFluid;
+
 /// Canonical identifier for carbon dioxide.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct CarbonDioxide;
@@ -28,8 +31,8 @@ impl StepIntegrable<Time> for CarbonDioxide {
     }
 }
 
-#[cfg(feature = "coolprop")]
-impl crate::support::thermo::model::coolprop::CoolPropFluid for CarbonDioxide {
+#[cfg(feature = "coolprop-static")]
+impl CoolPropFluid for CarbonDioxide {
     const BACKEND: &'static str = "HEOS";
     const NAME: &'static str = "CarbonDioxide";
 }

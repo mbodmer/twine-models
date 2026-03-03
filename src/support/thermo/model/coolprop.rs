@@ -1,16 +1,14 @@
 //! CoolProp-backed fluid property model.
 
 mod error;
+mod ffi;
+mod wrapper;
 
 use std::{
     marker::PhantomData,
     sync::{Mutex, MutexGuard},
 };
 
-use rfluids::{
-    io::{FluidInputPair, FluidParam, FluidTrivialParam},
-    native::AbstractState,
-};
 use uom::si::{
     available_energy::joule_per_kilogram,
     f64::{MassDensity, MolarMass, Pressure, SpecificHeatCapacity, ThermodynamicTemperature},
@@ -30,20 +28,23 @@ use crate::support::thermo::{
 };
 use crate::support::units::{SpecificEnthalpy, SpecificEntropy, SpecificInternalEnergy};
 
+use ffi::{InputPair, OutputParam};
+use wrapper::AbstractState;
+
 pub use error::CoolPropError;
 
 /// Trait used to mark fluids as usable with the [`CoolProp`] model.
 ///
 /// Implementors provide the backend and fluid identifiers needed to construct a
-/// `CoolProp` `AbstractState`.
-#[cfg_attr(docsrs, doc(cfg(feature = "coolprop")))]
+/// CoolProp `AbstractState`.
+#[cfg_attr(docsrs, doc(cfg(feature = "coolprop-static")))]
 pub trait CoolPropFluid: Default + Send + Sync + 'static {
     const BACKEND: &'static str;
     const NAME: &'static str;
 }
 
 /// A fluid property model backed by `CoolProp`.
-#[cfg_attr(docsrs, doc(cfg(feature = "coolprop")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "coolprop-static")))]
 pub struct CoolProp<F: CoolPropFluid> {
     state: Mutex<AbstractState>,
     _f: PhantomData<F>,
@@ -75,7 +76,7 @@ impl<F: CoolPropFluid> CoolProp<F> {
     /// Returns [`CoolPropError`] if the call fails.
     pub fn molar_mass(&self) -> Result<MolarMass, CoolPropError> {
         let abstract_state = self.state.lock()?;
-        let molar_mass = abstract_state.keyed_output(FluidTrivialParam::MolarMass)?;
+        let molar_mass = abstract_state.keyed_output(OutputParam::MOLAR_MASS)?;
         Ok(MolarMass::new::<kilogram_per_mole>(molar_mass))
     }
 
@@ -86,7 +87,7 @@ impl<F: CoolPropFluid> CoolProp<F> {
     ) -> Result<MutexGuard<'_, AbstractState>, CoolPropError> {
         let mut abstract_state = self.state.lock()?;
         abstract_state.update(
-            FluidInputPair::DMassT,
+            InputPair::DMASS_T,
             state.density.get::<kilogram_per_cubic_meter>(),
             state.temperature.get::<kelvin>(),
         )?;
@@ -98,8 +99,8 @@ impl<F: CoolPropFluid> HasPressure for CoolProp<F> {
     fn pressure(&self, state: &State<Self::Fluid>) -> Result<Pressure, PropertyError> {
         let abstract_state = self.lock_with_state(state)?;
         let pressure = abstract_state
-            .keyed_output(FluidParam::P)
-            .map_err(CoolPropError::Rfluids)?;
+            .keyed_output(OutputParam::P)
+            .map_err(CoolPropError::from)?;
         Ok(Pressure::new::<pascal>(pressure))
     }
 }
@@ -111,8 +112,8 @@ impl<F: CoolPropFluid> HasInternalEnergy for CoolProp<F> {
     ) -> Result<SpecificInternalEnergy, PropertyError> {
         let abstract_state = self.lock_with_state(state)?;
         let internal_energy = abstract_state
-            .keyed_output(FluidParam::UMass)
-            .map_err(CoolPropError::Rfluids)?;
+            .keyed_output(OutputParam::UMASS)
+            .map_err(CoolPropError::from)?;
         Ok(SpecificInternalEnergy::new::<joule_per_kilogram>(
             internal_energy,
         ))
@@ -123,8 +124,8 @@ impl<F: CoolPropFluid> HasEnthalpy for CoolProp<F> {
     fn enthalpy(&self, state: &State<Self::Fluid>) -> Result<SpecificEnthalpy, PropertyError> {
         let abstract_state = self.lock_with_state(state)?;
         let enthalpy = abstract_state
-            .keyed_output(FluidParam::HMass)
-            .map_err(CoolPropError::Rfluids)?;
+            .keyed_output(OutputParam::HMASS)
+            .map_err(CoolPropError::from)?;
         Ok(SpecificEnthalpy::new::<joule_per_kilogram>(enthalpy))
     }
 }
@@ -133,8 +134,8 @@ impl<F: CoolPropFluid> HasEntropy for CoolProp<F> {
     fn entropy(&self, state: &State<Self::Fluid>) -> Result<SpecificEntropy, PropertyError> {
         let abstract_state = self.lock_with_state(state)?;
         let entropy = abstract_state
-            .keyed_output(FluidParam::SMass)
-            .map_err(CoolPropError::Rfluids)?;
+            .keyed_output(OutputParam::SMASS)
+            .map_err(CoolPropError::from)?;
         Ok(SpecificEntropy::new::<joule_per_kilogram_kelvin>(entropy))
     }
 }
@@ -143,8 +144,8 @@ impl<F: CoolPropFluid> HasCp for CoolProp<F> {
     fn cp(&self, state: &State<Self::Fluid>) -> Result<SpecificHeatCapacity, PropertyError> {
         let abstract_state = self.lock_with_state(state)?;
         let cp = abstract_state
-            .keyed_output(FluidParam::CpMass)
-            .map_err(CoolPropError::Rfluids)?;
+            .keyed_output(OutputParam::CP_MASS)
+            .map_err(CoolPropError::from)?;
         Ok(SpecificHeatCapacity::new::<joule_per_kilogram_kelvin>(cp))
     }
 }
@@ -153,8 +154,8 @@ impl<F: CoolPropFluid> HasCv for CoolProp<F> {
     fn cv(&self, state: &State<Self::Fluid>) -> Result<SpecificHeatCapacity, PropertyError> {
         let abstract_state = self.lock_with_state(state)?;
         let cv = abstract_state
-            .keyed_output(FluidParam::CvMass)
-            .map_err(CoolPropError::Rfluids)?;
+            .keyed_output(OutputParam::CV_MASS)
+            .map_err(CoolPropError::from)?;
         Ok(SpecificHeatCapacity::new::<joule_per_kilogram_kelvin>(cv))
     }
 }
@@ -169,7 +170,7 @@ impl<F: CoolPropFluid> StateFrom<(F, ThermodynamicTemperature, MassDensity)> for
         let mut abstract_state = self.state.lock()?;
         // Update CoolProp to validate the T-D state and surface invalid inputs early.
         abstract_state.update(
-            FluidInputPair::DMassT,
+            InputPair::DMASS_T,
             density.get::<kilogram_per_cubic_meter>(),
             temperature.get::<kelvin>(),
         )?;
@@ -191,12 +192,12 @@ impl<F: CoolPropFluid> StateFrom<(F, ThermodynamicTemperature, Pressure)> for Co
     ) -> Result<State<F>, Self::Error> {
         let mut abstract_state = self.state.lock()?;
         abstract_state.update(
-            FluidInputPair::PT,
+            InputPair::PT,
             pressure.get::<pascal>(),
             temperature.get::<kelvin>(),
         )?;
 
-        let density = abstract_state.keyed_output(FluidParam::DMass)?;
+        let density = abstract_state.keyed_output(OutputParam::DMASS)?;
 
         Ok(State {
             temperature,
@@ -215,13 +216,13 @@ impl<F: CoolPropFluid> StateFrom<(F, Pressure, SpecificEnthalpy)> for CoolProp<F
     ) -> Result<State<F>, Self::Error> {
         let mut abstract_state = self.state.lock()?;
         abstract_state.update(
-            FluidInputPair::HMassP,
+            InputPair::HMASS_P,
             enthalpy.get::<joule_per_kilogram>(),
             pressure.get::<pascal>(),
         )?;
 
-        let temperature = abstract_state.keyed_output(FluidParam::T)?;
-        let density = abstract_state.keyed_output(FluidParam::DMass)?;
+        let temperature = abstract_state.keyed_output(OutputParam::T)?;
+        let density = abstract_state.keyed_output(OutputParam::DMASS)?;
 
         Ok(State {
             temperature: ThermodynamicTemperature::new::<kelvin>(temperature),
@@ -240,13 +241,13 @@ impl<F: CoolPropFluid> StateFrom<(F, Pressure, SpecificEntropy)> for CoolProp<F>
     ) -> Result<State<F>, Self::Error> {
         let mut abstract_state = self.state.lock()?;
         abstract_state.update(
-            FluidInputPair::PSMass,
+            InputPair::PS_MASS,
             pressure.get::<pascal>(),
             entropy.get::<joule_per_kilogram_kelvin>(),
         )?;
 
-        let temperature = abstract_state.keyed_output(FluidParam::T)?;
-        let density = abstract_state.keyed_output(FluidParam::DMass)?;
+        let temperature = abstract_state.keyed_output(OutputParam::T)?;
+        let density = abstract_state.keyed_output(OutputParam::DMASS)?;
 
         Ok(State {
             temperature: ThermodynamicTemperature::new::<kelvin>(temperature),
@@ -265,13 +266,13 @@ impl<F: CoolPropFluid> StateFrom<(F, SpecificEnthalpy, SpecificEntropy)> for Coo
     ) -> Result<State<F>, Self::Error> {
         let mut abstract_state = self.state.lock()?;
         abstract_state.update(
-            FluidInputPair::HMassSMass,
+            InputPair::HMASS_SMASS,
             enthalpy.get::<joule_per_kilogram>(),
             entropy.get::<joule_per_kilogram_kelvin>(),
         )?;
 
-        let temperature = abstract_state.keyed_output(FluidParam::T)?;
-        let density = abstract_state.keyed_output(FluidParam::DMass)?;
+        let temperature = abstract_state.keyed_output(OutputParam::T)?;
+        let density = abstract_state.keyed_output(OutputParam::DMASS)?;
 
         Ok(State {
             temperature: ThermodynamicTemperature::new::<kelvin>(temperature),
@@ -281,9 +282,9 @@ impl<F: CoolPropFluid> StateFrom<(F, SpecificEnthalpy, SpecificEntropy)> for Coo
     }
 }
 
-// Static assertion: CoolProp<F> must be Send + Sync for any CoolPropFluid.
-// Thread-safety is provided by rfluids, which serializes all CoolProp FFI calls
-// through a global mutex. Our local Mutex<AbstractState> provides interior
+// Static assertion: `CoolProp<F>` must be `Send + Sync` for any `CoolPropFluid`.
+// Thread safety is provided by `COOLPROP_LOCK` in `wrapper.rs`, which serializes
+// all CoolProp FFI calls. The local `Mutex<AbstractState>` provides interior
 // mutability and keeps update/query call pairs atomic.
 #[allow(dead_code)]
 const _: () = {
