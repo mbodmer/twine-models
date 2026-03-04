@@ -3144,7 +3144,7 @@ checksum = "39b208bb973f853140976c2df20b0322f375e2f5d09aa66f52e41980ab827118"
 
 [[package]]
 name = "twine-models"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "approx",
  "cmake",
