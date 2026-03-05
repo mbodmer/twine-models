@@ -2,65 +2,48 @@ use uom::si::f64::HeatTransfer;
 
 /// Options for specifying tank insulation.
 ///
-/// The insulation setting determines what heat transfer coefficient (thermal transmittance)
-/// is applied between the tank fluid and the surrounding environment on all exposed surfaces.
+/// The insulation setting determines the overall heat transfer coefficient
+/// (U-value) applied between the tank fluid and the surrounding environment
+/// on each exposed surface.
 ///
-/// * `Adiabatic` — no heat transfer.
-/// * `Conductive { bottom, side, top }` — thermal transmittance (U-value) for each face.
-///
-/// The U-values are specified in W/(m²·K) and are multiplied by the surface area of each
-/// face during tank construction to compute the overall thermal conductance (UA in W/K).
-///
-/// Constructors such as [`Insulation::uniform`] and [`Insulation::conductive`]
-/// make it easy to build the desired value.
-
+/// During tank construction, each U-value is multiplied by the corresponding
+/// surface area to produce a thermal conductance (UA).
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
 pub enum Insulation {
     /// The tank is perfectly insulated — no heat transfer to the environment.
     Adiabatic,
 
-    /// Conductive heat loss to the environment.
+    /// Heat transfer to the environment defined by per-face U-values.
     ///
-    /// Each face may have its own U-value (thermal transmittance).
-    /// Values are thermal transmittance in e.g. W/(m²·K).
-    Conductive {
-        /// Thermal transmittance (U-value) of the bottom face.
+    /// Usually a loss, but could be a heat gain if the environment is warmer
+    /// than the tank fluid.
+    UValue {
+        /// Heat transfer coefficient (U-value) of the bottom face to the environment.
         bottom: HeatTransfer,
-        /// Thermal transmittance (U-value) of the side face.
+
+        /// Heat transfer coefficient (U-value) of the side face to the environment.
         side: HeatTransfer,
-        /// Thermal transmittance (U-value) of the top face.
+
+        /// Heat transfer coefficient (U-value) of the top face to the environment.
         top: HeatTransfer,
     },
 }
 
 impl Insulation {
-    /// Construct an adiabatic setting (same as `Insulation::Adiabatic`).
-    pub fn adiabatic() -> Self {
-        Insulation::Adiabatic
-    }
-
-    /// Convenience for a uniform thermal transmittance on every face.
-    ///
-    /// # Arguments
-    ///
-    /// * `u` - Thermal transmittance (U-value) in W/(m²·K)
+    /// Uniform heat transfer coefficient (U-value) to the environment on every face.
+    #[must_use]
     pub fn uniform(u: HeatTransfer) -> Self {
-        Insulation::Conductive {
+        Self::UValue {
             bottom: u,
             side: u,
             top: u,
         }
     }
 
-    /// Full constructor when faces differ.
-    ///
-    /// # Arguments
-    ///
-    /// * `bottom` - Thermal transmittance (U-value) of the bottom face in W/(m²·K)
-    /// * `side` - Thermal transmittance (U-value) of the side face in W/(m²·K)
-    /// * `top` - Thermal transmittance (U-value) of the top face in W/(m²·K)
-    pub fn conductive(bottom: HeatTransfer, side: HeatTransfer, top: HeatTransfer) -> Self {
-        Insulation::Conductive { bottom, side, top }
+    /// Per-face heat transfer coefficient (U-value) to the environment.
+    #[must_use]
+    pub fn u_value(bottom: HeatTransfer, side: HeatTransfer, top: HeatTransfer) -> Self {
+        Self::UValue { bottom, side, top }
     }
 }

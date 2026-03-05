@@ -384,40 +384,22 @@ fn node_ua<const N: usize>(
     insulation: Insulation,
     node_geometries: &[NodeGeometry; N],
 ) -> Adjacent<ThermalConductance> {
-    use uom::si::{
-        heat_transfer::watt_per_square_meter_kelvin, thermal_conductance::watt_per_kelvin,
-    };
-
     let node = node_geometries[i];
 
-    let (u_bot, u_side, u_top) = match insulation {
-        Insulation::Adiabatic => {
-            // Create zero HeatTransfer values
-            (
-                HeatTransfer::new::<watt_per_square_meter_kelvin>(0.0),
-                HeatTransfer::new::<watt_per_square_meter_kelvin>(0.0),
-                HeatTransfer::new::<watt_per_square_meter_kelvin>(0.0),
-            )
-        }
-        Insulation::Conductive { bottom, side, top } => (bottom, side, top),
+    let (u_bottom, u_side, u_top) = match insulation {
+        Insulation::Adiabatic => (HeatTransfer::ZERO, HeatTransfer::ZERO, HeatTransfer::ZERO),
+        Insulation::UValue { bottom, side, top } => (bottom, side, top),
     };
-
-    // Compute UA by multiplying U (W/(m²·K)) by area (m²) to get conductance (W/K)
-    // HeatTransfer stores values in W/(m²·K)
-    // When multiplied by area, we get the proper ThermalConductance (W/K)
-    let ua_bot = ThermalConductance::new::<watt_per_kelvin>(u_bot.value * node.area.bottom.value);
-    let ua_side = ThermalConductance::new::<watt_per_kelvin>(u_side.value * node.area.side.value);
-    let ua_top = ThermalConductance::new::<watt_per_kelvin>(u_top.value * node.area.top.value);
 
     Adjacent {
         bottom: if i == 0 {
-            ua_bot
+            u_bottom * node.area.bottom
         } else {
             ua_between_nodes(k, node_geometries[i - 1], node)
         },
-        side: ua_side,
+        side: u_side * node.area.side,
         top: if i == n - 1 {
-            ua_top
+            u_top * node.area.top
         } else {
             ua_between_nodes(k, node, node_geometries[i + 1])
         },
@@ -432,7 +414,11 @@ mod tests {
 
     use approx::assert_relative_eq;
     use uom::si::{
-        f64::{Length, MassDensity, Power, SpecificHeatCapacity, ThermalConductivity, VolumeRate},
+        f64::{
+            HeatTransfer, Length, MassDensity, Power, SpecificHeatCapacity, ThermalConductivity,
+            VolumeRate,
+        },
+        heat_transfer::watt_per_square_meter_kelvin,
         length::meter,
         mass_density::kilogram_per_cubic_meter,
         power::kilowatt,
@@ -537,12 +523,6 @@ mod tests {
 
     #[test]
     fn insulation_type_affects_thermal_response() {
-        use uom::si::{
-            f64::{HeatTransfer, Length},
-            heat_transfer::watt_per_square_meter_kelvin,
-            length::meter,
-        };
-
         let fluid = Fluid {
             density: MassDensity::new::<kilogram_per_cubic_meter>(1000.0),
             specific_heat: SpecificHeatCapacity::new::<kilojoule_per_kilogram_kelvin>(4.0),
@@ -561,7 +541,7 @@ mod tests {
         }];
 
         // Create two identical tanks with different insulation
-        // Specify thermal transmittance (U-values) in W/(m²·K).
+        // Specify overall heat transfer coefficients (U-values) in W/(m²·K).
         // Geometry: vertical cylinder with diameter = sqrt(4/π), height = 3.0
         // For 3 nodes (each 1m height, so areas are: bottom = 1 m², side ≈ 3.545 m², top = 1 m²)
         //
@@ -574,7 +554,7 @@ mod tests {
         let u_top = HeatTransfer::new::<watt_per_square_meter_kelvin>(2000.0);
 
         let insulation_adiabatic = Insulation::Adiabatic;
-        let insulation_conductive = Insulation::conductive(u_bottom, u_side, u_top);
+        let insulation_u_value = Insulation::u_value(u_bottom, u_side, u_top);
 
         let tank_adiabatic = StratifiedTank::new(
             fluid,
@@ -584,10 +564,10 @@ mod tests {
             port_locations,
         )
         .unwrap();
-        let tank_conductive = StratifiedTank::new(
+        let tank_u_value = StratifiedTank::new(
             fluid,
             geometry.clone(),
-            insulation_conductive,
+            insulation_u_value,
             aux_locations,
             port_locations,
         )
@@ -610,14 +590,14 @@ mod tests {
 
         // Evaluate both tanks
         let out_adiabatic = tank_adiabatic.evaluate(&input);
-        let out_conductive = tank_conductive.evaluate(&input);
+        let out_u_value = tank_u_value.evaluate(&input);
 
         // Adiabatic tank should have zero derivatives (no heat loss)
         for deriv in out_adiabatic.derivatives {
             assert_relative_eq!(k_per_s(deriv), 0.0, max_relative = 1e-10);
         }
 
-        // Conductive tank: heat loss through external insulation
+        // U-value tank: heat loss through external insulation
         // With k=0 for fluid, internal node-to-node conduction is zero.
         // Only external surfaces conduct to environment.
         // dT/dt = UA_ext * ΔT / (V * ρ * cp)
@@ -630,8 +610,8 @@ mod tests {
         //   dT/dt = 2000 * 40 / 4e6 = -0.02 K/s
         // Node 2 (top): UA_external = 2000 W/K (side) + 2000 W/K (top) = 4000 W/K
         //   dT/dt = 4000 * 40 / 4e6 = -0.04 K/s
-        assert_relative_eq!(k_per_s(out_conductive.derivatives[0]), -0.04);
-        assert_relative_eq!(k_per_s(out_conductive.derivatives[1]), -0.02);
-        assert_relative_eq!(k_per_s(out_conductive.derivatives[2]), -0.04);
+        assert_relative_eq!(k_per_s(out_u_value.derivatives[0]), -0.04);
+        assert_relative_eq!(k_per_s(out_u_value.derivatives[1]), -0.02);
+        assert_relative_eq!(k_per_s(out_u_value.derivatives[2]), -0.04);
     }
 }
